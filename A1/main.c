@@ -17,6 +17,7 @@
 struct process {
     pid_t pid;
     char *command;
+    int running;
 };
 
 char** parseString(char* cmd, char *tokens[], int *bg) {
@@ -77,7 +78,13 @@ void handleChildProccess(char *tokens[], struct process processes[], int jobCoun
             printf("%s \n", wd);
     } else if(strcmp(tokens[0], "bglist") == 0) {
         for(int i = 0; i < jobCount; i++) {
-            printf("%d: %s\n", i, processes[i].command);
+            char status;
+            if(processes[i].running == 0) {
+                status = "S";
+            } else {
+                status = "R";
+            }
+            printf("%d[%s]: %s\n", i, status, processes[i].command);
         }
         printf("Total Background Jobs: %d\n", jobCount);
     } else if(strcmp(tokens[0], "bgkill") == 0) {
@@ -143,6 +150,7 @@ int main ( void ) {
                 strcpy(commandCopy, parsedCommand[0]);
                 processes[jobCount].command = commandCopy;
                 processes[jobCount].pid = pid;
+                processes[jobCount].running = 1;
                 jobCount++;
             }
         }
