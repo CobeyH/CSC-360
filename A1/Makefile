@@ -1,5 +1,5 @@
 CFLAGS = -Wall -g  
-LDFLAGS =  
+LDFLAGS = -L /usr/local/Cellar/readline/8.0.4/lib
 
 OBJS = main.o
 
