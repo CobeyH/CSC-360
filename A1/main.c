@@ -80,11 +80,11 @@ void handleChildProccess(char *tokens[], struct process processes[], int jobCoun
         for(int i = 0; i < jobCount; i++) {
             char status;
             if(processes[i].running == 0) {
-                status = "S";
+                status = 'S';
             } else {
-                status = "R";
+                status = 'R';
             }
-            printf("%d[%s]: %s\n", i, status, processes[i].command);
+            printf("%d[%c]: %s\n", i, status, processes[i].command);
         }
         printf("Total Background Jobs: %d\n", jobCount);
     } else if(strcmp(tokens[0], "bgkill") == 0) {
@@ -97,7 +97,6 @@ void handleChildProccess(char *tokens[], struct process processes[], int jobCoun
         if(jobToKill > 4) {
             return;
         }
-        printf("Job to kill: %d\n", jobToKill);
         int killStatus = kill(processes[jobToKill].pid, SIGKILL);
         if(killStatus < 0) {
             printf("Failed to kill job\n");
@@ -105,6 +104,15 @@ void handleChildProccess(char *tokens[], struct process processes[], int jobCoun
             processes[jobToKill].pid = 0;
             cleanupProcessList(processes, &jobCount);
         }
+    } else if(strcmp(tokens[0], "stop") == 0) {
+        struct process process = processes[atoi(tokens[1])];
+        if(process.running == 0) {
+            printf("The job you have specified is already stopped");
+        }
+    } else if(strcmp(tokens[0], "start") == 0) {
+        if(process.running == 1) {
+            printf("The job you have specified is already running\n");
+        } 
     } else {
         int rc;
         rc = execvp(tokens[0], tokens);
@@ -129,12 +137,10 @@ int main ( void ) {
         char **parsedCommand = parseString(cmd, tokens, &bg);
         cleanupProcessList(processes, &jobCount);
         pid = fork();
-        fflush(stdin);
         if(pid < 0) {
             printf("Fork Failed.\n");
             return -1;
         }
-        fflush(stdin);
         if (pid == 0) {
              handleChildProccess(parsedCommand, processes, jobCount);
              return 1;
