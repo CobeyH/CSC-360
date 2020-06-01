@@ -14,6 +14,9 @@
 #include <string.h>
 #include <signal.h>
 
+#define MAX_COMMAND_LEN 256
+#define PROCESS_LIMIT 5
+
 struct process {
     pid_t pid;
     char *command;
@@ -30,7 +33,6 @@ char** parseString(char* cmd, char *tokens[], int *bg) {
     tokens[i] = NULL;
     *bg = strcmp(tokens[0], "bg"); 
     if(*bg == 0) {
-        printf("Going to run in background\n");
         return &tokens[1];
     }
     return &tokens[0];
@@ -41,7 +43,7 @@ char** parseString(char* cmd, char *tokens[], int *bg) {
 void cleanupProcessList(struct process processes[], int *jobCount) {
         //Set up processes struct
         struct process *p = processes;
-        for(int j = 0; j < 5; j++) {
+        for(int j = 0; j < PROCESS_LIMIT; j++) {
             if(processes[j].pid == 0) {
                 continue;
             }
@@ -52,29 +54,31 @@ void cleanupProcessList(struct process processes[], int *jobCount) {
             // Terminated Case
             } else if(childpid > 0) {
                 processes[j].pid = 0;
+                free(processes[j].command);
                 *jobCount = *jobCount - 1;
             // Still running case
             } else {
                 if(p->pid != processes[j].pid) {
                     p->pid = childpid;
+                    p->command = processes[j].command;
+                    p->running = processes[j].running;
                     processes[j].pid = 0;
-                    free(processes[j].command);
                 }
                 p++;
             }
         }
 }
 
+void getWorkingDirectory(char wd[MAX_COMMAND_LEN]) {
+    if(getcwd(wd, MAX_COMMAND_LEN) == NULL) {
+        perror("Failed to get working directory\n");
+    }
+}
+
 void handleChildProccess(char *tokens[], struct process processes[], int jobCount) {
-    if(strcmp(tokens[0], "cd") == 0) {
-        if(chdir(tokens[1]) != 0) {
-            perror("Failed to change directory\n");
-        }
-    } else if(strcmp(tokens[0], "pwd") == 0) {
-            char wd[256];
-            if(getcwd(wd, sizeof(wd)) != 0) {
-                perror("Failed to get working directory\n");
-            }
+    if(strcmp(tokens[0], "pwd") == 0) {
+            char wd[MAX_COMMAND_LEN];
+            getWorkingDirectory(wd);
             printf("%s \n", wd);
     } else if(strcmp(tokens[0], "bglist") == 0) {
         for(int i = 0; i < jobCount; i++) {
@@ -87,77 +91,108 @@ void handleChildProccess(char *tokens[], struct process processes[], int jobCoun
             printf("%d[%c]: %s\n", i, status, processes[i].command);
         }
         printf("Total Background Jobs: %d\n", jobCount);
-    } else if(strcmp(tokens[0], "bgkill") == 0) {
-        if(tokens[1] == NULL) {
-            printf("Incorrect arguments passed. bgkill requires a process number to kill\n");
-        } else if((int)tokens[1] < jobCount) {
-            printf("The job you have specified does not exist\n");
-        }
-        int jobToKill = atoi(tokens[1]);
-        if(jobToKill > 4) {
-            return;
-        }
-        int killStatus = kill(processes[jobToKill].pid, SIGKILL);
-        if(killStatus < 0) {
-            printf("Failed to kill job\n");
-        } else {
-            processes[jobToKill].pid = 0;
-            cleanupProcessList(processes, &jobCount);
-        }
-    } else if(strcmp(tokens[0], "stop") == 0) {
-        struct process process = processes[atoi(tokens[1])];
-        if(process.running == 0) {
-            printf("The job you have specified is already stopped");
-        }
-    } else if(strcmp(tokens[0], "start") == 0) {
-        if(process.running == 1) {
-            printf("The job you have specified is already running\n");
-        } 
-    } else {
+    }  else {
         int rc;
         rc = execvp(tokens[0], tokens);
     }
 }
 
 int main ( void ) {
-        char * display = "shell > ";
+        char display[MAX_COMMAND_LEN + 3];
+        getWorkingDirectory(display);
         struct process processes[5];
         for(int i = 0; i < 5; i++) {
             processes[i].pid = 0; 
+            processes[i].running = 0;
         }
         int jobCount = 0;
         //TODO: Update the display with the working directory
         //TODO: Fix case where nothing is passed
         while(1) {
         // Handle user input parsing into an array of strings
+        getWorkingDirectory(display);
+        strcat(display, " > ");
 		char *cmd = readline (display);
         pid_t pid;
         char *tokens[17];
         int bg = 0;
         char **parsedCommand = parseString(cmd, tokens, &bg);
         cleanupProcessList(processes, &jobCount);
-        pid = fork();
-        if(pid < 0) {
-            printf("Fork Failed.\n");
-            return -1;
-        }
-        if (pid == 0) {
-             handleChildProccess(parsedCommand, processes, jobCount);
-             return 1;
-        } else {
-            // Case for foreground operation in the parent
-            if(bg != 0) {
-                int status;
-                pid_t anotherpid;
-                anotherpid = wait(&status);
-            // Case for background operation
+        if(strcmp(tokens[0], "cd") == 0) {
+                if(chdir(tokens[1]) != 0) {
+                    perror("Failed to change directory\n");
+                }
+        } else if(strcmp(tokens[0], "stop") == 0) {
+            int jobToStop = atoi(tokens[1]);
+            struct process process = processes[jobToStop];
+            if(process.running == 0) {
+                printf("The job you have specified is already stopped\n");
+                continue;
             } else {
-                char* commandCopy = malloc(strlen(parsedCommand[0]));
-                strcpy(commandCopy, parsedCommand[0]);
-                processes[jobCount].command = commandCopy;
-                processes[jobCount].pid = pid;
-                processes[jobCount].running = 1;
-                jobCount++;
+                int status = kill(process.pid, SIGSTOP);
+                if(status < 0) {
+                    printf("Failed to stop process\n");
+                    continue;
+                } else {
+                    processes[jobToStop].running = 0;
+                }
+            }
+        } else if(strcmp(tokens[0], "start") == 0) {
+            int jobToStart = atoi(tokens[1]);
+            struct process process = processes[jobToStart];
+            if(process.running == 1) {
+                printf("The job you have specified is already running\n");
+                continue;
+            } else {
+                int status = kill(process.pid, SIGCONT);
+                if(status < 0) {
+                    printf("Failed to restart process");
+                    continue;
+                } else {
+                    processes[jobToStart].running = 1;
+                }
+            }
+        } else if(strcmp(tokens[0], "bgkill") == 0) {
+            if(tokens[1] == NULL) {
+                printf("Incorrect arguments passed. bgkill requires a process number to kill\n");
+                continue;
+            } else if(atoi(tokens[1]) >= jobCount) {
+                printf("The job you have specified with index %d does not exist\n there are %d jobs running\n", atoi(tokens[1]), jobCount);
+                continue;
+            }
+            int jobToKill = atoi(tokens[1]);
+            if(jobToKill > 4) {
+                printf("ERROR: Job specified is greater than the maximum number of jobs\n");
+                continue;
+            }
+            int killStatus = kill(processes[jobToKill].pid, SIGKILL);
+            if(killStatus < 0) {
+                printf("Failed to kill job\n");
+            }
+        } else {
+            pid = fork();
+            if(pid < 0) {
+                printf("Fork Failed.\n");
+                return -1;
+            }
+            if (pid == 0) {
+                 handleChildProccess(parsedCommand, processes, jobCount);
+                 return 1;
+            } else {
+                // Case for foreground operation in the parent
+                if(bg != 0) {
+                    int status;
+                    pid_t anotherpid;
+                    anotherpid = wait(&status);
+                // Case for background operation
+                } else {
+                    char* commandCopy = malloc(strlen(parsedCommand[0]));
+                    strcpy(commandCopy, parsedCommand[0]);
+                    processes[jobCount].command = commandCopy;
+                    processes[jobCount].pid = pid;
+                    processes[jobCount].running = 1;
+                    jobCount++;
+                }
             }
         }
 		free (cmd);
