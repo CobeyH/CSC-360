@@ -57,7 +57,6 @@ void cleanupProcessList(struct process processes[], int *jobCount) {
             printf("Error %d checking status of child with pid: %d\n", childpid, processes[j].pid);
             // Terminated Case
         } else if(childpid > 0) {
-            printf("Job %d finished executing", j);
             processes[j].pid = 0;
             free(processes[j].command);
             *jobCount = *jobCount - 1;
@@ -94,8 +93,7 @@ void handleChildProccess(char *tokens[], struct process processes[], int jobCoun
         }
         printf("Total Background Jobs: %d\n", jobCount);
     }  else {
-        int rc;
-        rc = execvp(tokens[0], tokens);
+         execvp(tokens[0], tokens);
     }
 }
 
@@ -199,8 +197,7 @@ int main ( void ) {
                 // Case for foreground operation in the parent
                 if(bg != 0) {
                     int status;
-                    pid_t anotherpid;
-                    anotherpid = wait(&status);
+                    wait(&status);
                     // Case for background operation
                 } else {
                     char* commandCopy = malloc(strlen(parsedCommand[0]));
