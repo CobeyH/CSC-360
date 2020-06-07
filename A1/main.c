@@ -63,7 +63,7 @@ void cleanupProcessList(struct process processes[], int *jobCount) {
             // Still running case
         } else {
             if(p->pid != processes[j].pid) {
-                p->pid = childpid;
+                p->pid = processes[j].pid;
                 p->command = processes[j].command;
                 p->running = processes[j].running;
                 processes[j].pid = 0;
