@@ -12,6 +12,7 @@
 #include <semaphore.h>
 #include "train.h"
 
+
 /*
  * If you uncomment the following line, some debugging
  * output will be produced.
@@ -26,11 +27,14 @@ void CrossBridge (TrainInfo *train);
 void LeaveBridge (TrainInfo *train);
 
 sem_t bridge;
+sem_t mainLock;
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
-volatile long turn = -1;
+int numEast = 0;
+int numWest = 0;
 
-int goneEast = 0;
-
+pthread_cond_t nextEast = PTHREAD_COND_INITIALIZER;
+pthread_cond_t nextWest = PTHREAD_COND_INITIALIZER;
 /*
  * This function is started for each thread created by the
  * main thread.  Each thread is given a TrainInfo structure
@@ -63,13 +67,41 @@ void * Train ( void *arguments )
  * You will need to add code to this function to ensure that
  * the trains cross the bridge in the correct order.
  */
-void ArriveBridge ( TrainInfo *train )
-{
+void ArriveBridge ( TrainInfo *train ) {
 	printf ("Train %2d arrives going %s\n", train->trainId, 
 			(train->direction == DIRECTION_WEST ? "West" : "East"));
-
+    
+    int priority;
+    /* printf("About to lock mutex when new train arrives\n"); */
+    pthread_mutex_lock(&mutex);
+    if(train->direction == DIRECTION_EAST) {
+        numEast++;
+        priority = numEast;
+    } else {
+        numWest++;
+        priority = numWest;
+    }
+    /* printf("New train priority assigned %d\n", priority); */
+    while(priority != 0) {
+        priority--;
+        if(train-> direction == DIRECTION_EAST) {
+            /* printf("East Train is waiting with priority %d\n", priority); */
+            pthread_cond_wait(&nextEast, &mutex);
+        } else {
+            /* printf("West Train is waiting with priority %d\n", priority); */
+            pthread_cond_wait(&nextWest, &mutex);
+            /* printf("West Train is awake with priory %d\n", priority); */
+        }
+    }
+    /* printf("Train escaped while loop with priory %d\n", priority); */
+    if(train->direction == DIRECTION_EAST) {
+        numEast--;
+    } else {
+        numWest--;
+    }
+    pthread_mutex_unlock(&mutex);
+    /* printf("Train is about to cross bridge with priory %d\n", priority); */
     sem_wait(&bridge);
-	/* Your code here... */
 }
 
 /*
@@ -100,31 +132,29 @@ void CrossBridge ( TrainInfo *train )
 void LeaveBridge ( TrainInfo *train )
 {
     sem_post(&bridge);
+    sem_post(&mainLock);
 }
 
-int main ( int argc, char *argv[] )
-{
-	int		trainCount = 0;
+int main ( int argc, char *argv[]) {
 	char 		*filename = NULL;
 	pthread_t	*tids;
 	int		i;
     sem_init(&bridge, 0, 1);
+    sem_init(&mainLock, 0, 0);
+    int trainCount = 0;
 
 		
 	/* Parse the arguments */
-	if ( argc < 2 )
-	{
+	if ( argc < 2 ) {
 		printf ("Usage: part1 n {filename}\n\t\tn is number of trains\n");
 		printf ("\t\tfilename is input file to use (optional)\n");
 		exit(0);
 	}
 	
-	if ( argc >= 2 )
-	{
+	if ( argc >= 2 ) {
 		trainCount = atoi(argv[1]);
 	}
-	if ( argc == 3 )
-	{
+	if ( argc == 3 ) {
 		filename = argv[2];
 	}	
 	
@@ -141,8 +171,7 @@ int main ( int argc, char *argv[] )
 	 * Create all the train threads pass them the information about
 	 * length and direction as a TrainInfo structure
 	 */
-	for (i=0;i<trainCount;i++)
-	{
+	for (i=0;i<trainCount;i++) {
 		TrainInfo *info = createTrain();
 		
 		printf ("Train %2d headed %s length is %d\n", info->trainId,
@@ -154,18 +183,40 @@ int main ( int argc, char *argv[] )
 			printf ("Failed creation of Train.\n");
 			exit(0);
 		}
-        // TODO: Need to close input file
 	}
 
-	/*
-	 * This code waits for all train threads to terminate
-	 */
-	for (i=0;i<trainCount;i++)
-	{
+    int trainsGone = 0;
+    while(trainsGone < trainCount) {
+        if(numEast > 0) {
+            pthread_mutex_lock(&mutex);
+            pthread_cond_broadcast(&nextEast);
+            pthread_mutex_unlock(&mutex);
+            sem_wait(&mainLock);
+            trainsGone++;
+        }
+        if(numEast > 0) {
+            pthread_mutex_lock(&mutex);
+            pthread_cond_broadcast(&nextEast);
+            pthread_mutex_unlock(&mutex);
+            sem_wait(&mainLock);
+            trainsGone++;
+        }
+        if(numWest > 0) {
+            pthread_mutex_lock(&mutex);
+            pthread_cond_broadcast(&nextWest);
+            pthread_mutex_unlock(&mutex);
+            sem_wait(&mainLock);
+            trainsGone++;
+        }
+    }
+
+	// This code waits for all train threads to terminate
+	for (i=0;i<trainCount;i++) {
 		pthread_join (tids[i], NULL);
 	}
 	
 	free(tids);
-	return 0;
+    // TODO: Need to close input file
+    return 0;
 }
 
