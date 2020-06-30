@@ -20,7 +20,7 @@
  * Be sure to comment this line out again before you submit 
  */
 
-/* #define DEBUG	1 */
+#define DEBUG	1
 
 void ArriveBridge (TrainInfo *train);
 void CrossBridge (TrainInfo *train);
@@ -43,24 +43,24 @@ pthread_cond_t nextWest = PTHREAD_COND_INITIALIZER;
  */
 void * Train ( void *arguments )
 {
-	TrainInfo	*train = (TrainInfo *)arguments;
+    TrainInfo	*train = (TrainInfo *)arguments;
 
-	/* Sleep to simulate different arrival times */
-	usleep (train->length*SLEEP_MULTIPLE);
+    /* Sleep to simulate different arrival times */
+    usleep (train->length*SLEEP_MULTIPLE);
 
-	ArriveBridge (train);
-	CrossBridge  (train);
-	LeaveBridge  (train); 
+    ArriveBridge (train);
+    CrossBridge  (train);
+    LeaveBridge  (train); 
 
-	/* I decided that the paramter structure would be malloc'd 
-	 * in the main thread, but the individual threads are responsible
-	 * for freeing the memory.
-	 *
-	 * This way I didn't have to keep an array of parameter pointers
-	 * in the main thread.
- */
-	free (train);
-	return NULL;
+    /* I decided that the paramter structure would be malloc'd 
+     * in the main thread, but the individual threads are responsible
+     * for freeing the memory.
+     *
+     * This way I didn't have to keep an array of parameter pointers
+     * in the main thread.
+     */
+    free (train);
+    return NULL;
 }
 
 /*
@@ -68,11 +68,10 @@ void * Train ( void *arguments )
  * the trains cross the bridge in the correct order.
  */
 void ArriveBridge ( TrainInfo *train ) {
-	printf ("Train %2d arrives going %s\n", train->trainId, 
-			(train->direction == DIRECTION_WEST ? "West" : "East"));
-    
+    printf ("Train %2d arrives going %s\n", train->trainId, 
+            (train->direction == DIRECTION_WEST ? "West" : "East"));
+
     int priority;
-    /* printf("About to lock mutex when new train arrives\n"); */
     pthread_mutex_lock(&mutex);
     if(train->direction == DIRECTION_EAST) {
         numEast++;
@@ -81,26 +80,20 @@ void ArriveBridge ( TrainInfo *train ) {
         numWest++;
         priority = numWest;
     }
-    /* printf("New train priority assigned %d\n", priority); */
     while(priority != 0) {
         priority--;
         if(train-> direction == DIRECTION_EAST) {
-            /* printf("East Train is waiting with priority %d\n", priority); */
             pthread_cond_wait(&nextEast, &mutex);
         } else {
-            /* printf("West Train is waiting with priority %d\n", priority); */
             pthread_cond_wait(&nextWest, &mutex);
-            /* printf("West Train is awake with priory %d\n", priority); */
         }
     }
-    /* printf("Train escaped while loop with priory %d\n", priority); */
     if(train->direction == DIRECTION_EAST) {
         numEast--;
     } else {
         numWest--;
     }
     pthread_mutex_unlock(&mutex);
-    /* printf("Train is about to cross bridge with priory %d\n", priority); */
     sem_wait(&bridge);
 }
 
@@ -110,19 +103,19 @@ void ArriveBridge ( TrainInfo *train ) {
  */
 void CrossBridge ( TrainInfo *train )
 {
-	printf ("Train %2d is ON the bridge (%s)\n", train->trainId,
-			(train->direction == DIRECTION_WEST ? "West" : "East"));
-	fflush(stdout);
-	
-	/* 
-	 * This sleep statement simulates the time it takes to 
-	 * cross the bridge.  Longer trains take more time.
-	 */
-	usleep (train->length*SLEEP_MULTIPLE);
+    printf ("Train %2d is ON the bridge (%s)\n", train->trainId,
+            (train->direction == DIRECTION_WEST ? "West" : "East"));
+    fflush(stdout);
 
-	printf ("Train %2d is OFF the bridge(%s)\n", train->trainId, 
-			(train->direction == DIRECTION_WEST ? "West" : "East"));
-	fflush(stdout);
+    /* 
+     * This sleep statement simulates the time it takes to 
+     * cross the bridge.  Longer trains take more time.
+     */
+    usleep (train->length*SLEEP_MULTIPLE);
+
+    printf ("Train %2d is OFF the bridge(%s)\n", train->trainId, 
+            (train->direction == DIRECTION_WEST ? "West" : "East"));
+    fflush(stdout);
 }
 
 /*
@@ -136,70 +129,76 @@ void LeaveBridge ( TrainInfo *train )
 }
 
 int main ( int argc, char *argv[]) {
-	char 		*filename = NULL;
-	pthread_t	*tids;
-	int		i;
+    char 		*filename = NULL;
+    pthread_t	*tids;
+    int		i;
     sem_init(&bridge, 0, 1);
     sem_init(&mainLock, 0, 0);
     int trainCount = 0;
 
-		
-	/* Parse the arguments */
-	if ( argc < 2 ) {
-		printf ("Usage: part1 n {filename}\n\t\tn is number of trains\n");
-		printf ("\t\tfilename is input file to use (optional)\n");
-		exit(0);
-	}
-	
-	if ( argc >= 2 ) {
-		trainCount = atoi(argv[1]);
-	}
-	if ( argc == 3 ) {
-		filename = argv[2];
-	}	
-	
-	initTrain(filename);
-	
-	/*
-	 * Since the number of trains to simulate is specified on the command
-	 * line, we need to malloc space to store the thread ids of each train
-	 * thread.
-	 */
-	tids = (pthread_t *) malloc(sizeof(pthread_t)*trainCount);
-	
-	/*
-	 * Create all the train threads pass them the information about
-	 * length and direction as a TrainInfo structure
-	 */
-	for (i=0;i<trainCount;i++) {
-		TrainInfo *info = createTrain();
-		
-		printf ("Train %2d headed %s length is %d\n", info->trainId,
-			(info->direction == DIRECTION_WEST ? "West" : "East"),
-			info->length );
 
-		if ( pthread_create (&tids[i],0, Train, (void *)info) != 0 )
-		{
-			printf ("Failed creation of Train.\n");
-			exit(0);
-		}
-	}
+    /* Parse the arguments */
+    if ( argc < 2 ) {
+        printf ("Usage: part1 n {filename}\n\t\tn is number of trains\n");
+        printf ("\t\tfilename is input file to use (optional)\n");
+        exit(0);
+    }
+
+    if ( argc >= 2 ) {
+        trainCount = atoi(argv[1]);
+    }
+    if ( argc == 3 ) {
+        filename = argv[2];
+    }	
+
+    initTrain(filename);
+
+    /*
+     * Since the number of trains to simulate is specified on the command
+     * line, we need to malloc space to store the thread ids of each train
+     * thread.
+     */
+    tids = (pthread_t *) malloc(sizeof(pthread_t)*trainCount);
+
+    /*
+     * Create all the train threads pass them the information about
+     * length and direction as a TrainInfo structure
+     */
+    for (i=0;i<trainCount;i++) {
+        TrainInfo *info = createTrain();
+
+        printf ("Train %2d headed %s length is %d\n", info->trainId,
+                (info->direction == DIRECTION_WEST ? "West" : "East"),
+                info->length );
+
+        if ( pthread_create (&tids[i],0, Train, (void *)info) != 0 )
+        {
+            printf ("Failed creation of Train.\n");
+            exit(0);
+        }
+    }
 
     int trainsGone = 0;
     while(trainsGone < trainCount) {
-        if(numEast > 0) {
-            pthread_mutex_lock(&mutex);
-            pthread_cond_broadcast(&nextEast);
-            pthread_mutex_unlock(&mutex);
-            sem_wait(&mainLock);
-            trainsGone++;
-        }
-        if(numEast > 0) {
-            pthread_mutex_lock(&mutex);
-            pthread_cond_broadcast(&nextEast);
-            pthread_mutex_unlock(&mutex);
-            sem_wait(&mainLock);
-            trainsGone++;
+        int lastIteration = 0;
+        while(1) {
+            if(numEast > 0) {
+                pthread_mutex_lock(&mutex);
+                pthread_cond_broadcast(&nextEast);
+                pthread_mutex_unlock(&mutex);
+                sem_wait(&mainLock);
+                trainsGone++;
+            } else {
+                lastIteration = 0;
+                break;
+            }
+            if(numWest > 0) {
+                if(lastIteration) {
+                    break;
+                } else {
+                    lastIteration = 1;
+                }
+            }
         }
         if(numWest > 0) {
             pthread_mutex_lock(&mutex);
@@ -210,12 +209,12 @@ int main ( int argc, char *argv[]) {
         }
     }
 
-	// This code waits for all train threads to terminate
-	for (i=0;i<trainCount;i++) {
-		pthread_join (tids[i], NULL);
-	}
-	
-	free(tids);
+    // This code waits for all train threads to terminate
+    for (i=0;i<trainCount;i++) {
+        pthread_join (tids[i], NULL);
+    }
+
+    free(tids);
     // TODO: Need to close input file
     return 0;
 }
