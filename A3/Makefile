@@ -1,12 +1,12 @@
 # CC = gcc
 CFLAGS = -Wall -g   
 
-A3OBJS = diskinfo.o
+A3OBJS = diskinfo.o disklist.c
 
-all: diskinfo 
+all: diskinfo disklist
 
 assign3: $(A3OBJS)
-	$(CXX) $(CFLAGS) -o diskinfo $(A3OBJS) $(LDFLAGS) 
+	$(CXX) $(CFLAGS) -o diskinfo disklist $(A3OBJS) $(LDFLAGS) 
 
 clean: 
-	rm -rf $(A2OBJS) diskinfo 
+	rm -rf $(A2OBJS) diskinfo disklist
