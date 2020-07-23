@@ -2,16 +2,7 @@
 #include <stdio.h>
 #include <netinet/in.h>
 #include "Constants.h"
-
-struct SuperBlock {
-    char    ident[8];
-    int16_t blockSize;
-    int32_t fileSystemSize;
-    int32_t fatStart;
-    int32_t blocksInFat;
-    int32_t rootStart;
-    int32_t blocksInRoot;
-};
+#include "helpers.h"
 
 int main(int argc, char *argv[]) {
     if( argc < 2  ) {
@@ -26,15 +17,15 @@ int main(int argc, char *argv[]) {
         exit(0);
     }
     // The data is all read into the struct so that individual sections can be accessed
-    fread(&block, 1, 30, inputFile);
+    getSuperBlock(inputFile, &block);
     printf("Super block information:\n");
     printf("Block size: %d\nBlock count: %d\nFAT starts: %d\nFAT blocks: %d\nRoot directory start: %d\nRoot directory blocks: %d\n",
-            ntohs(block.blockSize), ntohs(block.fileSystemSize), ntohs(block.fatStart), ntohs(block.blocksInFat), ntohs(block.rootStart), ntohs(block.blocksInRoot));
+            block.blockSize, block.fileSystemSize, block.fatStart, block.blocksInFat, block.rootStart, block.blocksInRoot);
 
     int free = 0, reserved = 0, allocated = 0;
     int32_t entry;
-    fseek(inputFile, ntohs(block.fatStart) * DEFAULT_BLOCK_SIZE - 1, SEEK_SET);
-    for(int i = 0; i < ntohs(block.fileSystemSize); i++) {
+    fseek(inputFile, block.fatStart * DEFAULT_BLOCK_SIZE - 1, SEEK_SET);
+    for(int i = 0; i < block.fileSystemSize; i++) {
         fread(&entry, 1, FAT_ENTRY_SIZE, inputFile);
         switch(entry) {
             case FAT_FREE:
