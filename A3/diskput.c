@@ -35,11 +35,18 @@ int findNextFreeFAT(FILE* diskImage, int fatStart, int prevIndex) {
     return freeBlockPos;
 }
 
+void fillRootStats(struct RootBlock *dirEntry, char* fileName) {
+    struct stat stats;
+    stat(fileName, &stats);
+    dirEntry->fileSize = stats.st_size;
+}
+
 int min(int num1, int num2) {
     return (num1 > num2 ) ? num2 : num1;
 }
 
 int main(int argc, char *argv[]) {
+    const int fatEnd = FAT_EOF;
     if( argc < 2  ) {
         printf ("No input file found");
         exit(0);
@@ -59,28 +66,39 @@ int main(int argc, char *argv[]) {
     struct SuperBlock sBlock;
     getSuperBlock(diskImage, &sBlock);
     struct RootBlock newRootBlock;
-    struct stat stats;
-    stat(newFileName, &stats);
-    newRootBlock.fileSize = stats.st_size;
     int amountWritten = 0;
-    int blockPos = findFirstFreeRoot(diskImage, sBlock, &newRootBlock);
-    int buffer[DEFAULT_BLOCK_SIZE];
+    int rootEntryPos = findFirstFreeRoot(diskImage, sBlock, &newRootBlock);
+    fillRootStats(&newRootBlock, newFileName);
+    int blockPos = findNextFreeFAT(diskImage, sBlock.fatStart, 0);
     newRootBlock.startBlock = blockPos;
-    printf("%d\n", newRootBlock.startBlock);
-    do {
-        int nextBlockPos = findNextFreeFAT(diskImage, sBlock.fatStart, blockPos);
-        blockPos = htonl(blockPos);
+    char buffer[DEFAULT_BLOCK_SIZE];
+    int fileEnd = FAT_EOF;
+    // TODO: Need to write in the directory entry information
+    while(1) {    
         // Write the current block position into the FAT table
-        fwrite(&blockPos, 1, FAT_ENTRY_SIZE, diskImage);
         int amountToWrite = min(DEFAULT_BLOCK_SIZE, newRootBlock.fileSize - amountWritten);
         fread(buffer, 1, amountToWrite, newFile);
+        fflush(stdout);
+        printf("Read data from file\n");
+        for(int i = 0; i < amountToWrite; i++) {
+            printf("%c", buffer[i]);
+        }
+        printf("\n");
+        fseek(diskImage, DEFAULT_BLOCK_SIZE * blockPos, SEEK_SET);
+        fwrite(&buffer, 1, amountToWrite, diskImage);
+        amountWritten += amountToWrite;
+        if(amountWritten < newRootBlock.fileSize) {
+            int blockForNetwork = htonl(blockPos);
+            blockPos = findNextFreeFAT(diskImage, sBlock.fatStart, blockPos);
+            fwrite(&blockForNetwork, 1, FAT_ENTRY_SIZE, diskImage);
+        } else {
+            fwrite(&fileEnd, 1, FAT_ENTRY_SIZE, diskImage);
+            break;
+        }
+    };
 
-        blockPos = nextBlockPos;
-
-    } while(amountWritten < newRootBlock.fileSize);
 
     /* do { */
-    /*     fread(buffer, 1, amountToRead, diskImage); */
     /*     amountRead += amountToRead; */
     /*     fwrite(&buffer, 1, amountToRead, newFile); */
     /*     fseek(diskImage, DEFAULT_BLOCK_SIZE + fatEntryVal * FAT_ENTRY_SIZE, SEEK_SET); */
