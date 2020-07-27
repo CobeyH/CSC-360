@@ -2,7 +2,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <math.h>
 #include <netinet/in.h>
+#include <time.h>
 #include "Constants.h"
 #include "helpers.h"
 
@@ -23,22 +25,61 @@ int findFirstFreeRoot(FILE* diskImage, struct SuperBlock sBlock, struct RootBloc
 }
 
 int findNextFreeFAT(FILE* diskImage, int fatStart, int prevIndex) {
-    int fatEntryVal;
     fseek(diskImage, fatStart * DEFAULT_BLOCK_SIZE + prevIndex * FAT_ENTRY_SIZE, SEEK_SET);
+    int fatEntryVal = readInt32(diskImage);
     int freeBlockPos = prevIndex;
     while(fatEntryVal != FAT_FREE) {
         fatEntryVal = readInt32(diskImage);
         freeBlockPos++;
     }
     // The file pointer should point to the start of the entry so we need to back up to the start of the entry that was just read
-    fseek(diskImage, -FAT_ENTRY_SIZE, SEEK_CUR);
     return freeBlockPos;
+}
+
+void fillDate(struct Date *date) {
+    time_t rawTime = time(NULL);
+    struct tm *fullTime = localtime(&rawTime);
+    // Year function returns years since 1900 so we need to add 1900
+    date->year = 1900 + fullTime->tm_year;
+    date->month = fullTime->tm_mon;
+    date->day = fullTime->tm_mday;
+    date->hours = fullTime->tm_hour;
+    date->minutes = fullTime->tm_min;
+    date->seconds = fullTime->tm_sec;
+}
+
+void printDate(struct Date date) {
+    printf("%04d/%02d/%02d %02d:%02d:%02d\n", date.year, date.month, date.day, date.hours, date.minutes, date.seconds);
 }
 
 void fillRootStats(struct RootBlock *dirEntry, char* fileName) {
     struct stat stats;
     stat(fileName, &stats);
+    switch (stats.st_mode & S_IFMT) {
+        case S_IFDIR:  dirEntry->status = 0b11;    break;
+        case S_IFREG:  dirEntry->status = 0b101;   break;
+        default:       printf("Unsupported File type passed\n");   break;
+    }
     dirEntry->fileSize = stats.st_size;
+    double numBlocks = (dirEntry->fileSize) / DEFAULT_BLOCK_SIZE;
+    dirEntry->numBlocks = ceil(numBlocks);
+    for(int i = 0; i < DIRECTORY_MAX_NAME_LENGTH; i++) {
+        dirEntry->fileName[i] = fileName[i];
+    }
+    fillDate(&dirEntry->createTime);
+    fillDate(&dirEntry->modifyTime);
+    printDate(dirEntry->createTime);
+}
+
+void writeDirEntryToFile(FILE *file, int writePos, struct RootBlock dirEntry, struct SuperBlock sBlock) {
+    fseek(file, sBlock.rootStart * DEFAULT_BLOCK_SIZE + writePos * DIRECTORY_ENTRY_SIZE, SEEK_SET);
+    fwrite(&dirEntry.status, 1, 1, file);
+    writeInt32(file, dirEntry.startBlock);
+    writeInt32(file, dirEntry.numBlocks);
+    writeInt32(file, dirEntry.fileSize);
+    writeDate(file, dirEntry.createTime);
+    writeDate(file, dirEntry.modifyTime);
+    fwrite(&dirEntry.fileName, 1, 31, file);
 }
 
 int min(int num1, int num2) {
@@ -71,39 +112,30 @@ int main(int argc, char *argv[]) {
     fillRootStats(&newRootBlock, newFileName);
     int blockPos = findNextFreeFAT(diskImage, sBlock.fatStart, 0);
     newRootBlock.startBlock = blockPos;
+    writeDirEntryToFile(diskImage, rootEntryPos, newRootBlock, sBlock);
     char buffer[DEFAULT_BLOCK_SIZE];
     int fileEnd = FAT_EOF;
-    // TODO: Need to write in the directory entry information
+    printf("Status: %4X \n Number of Blocks: %d\n File Size: %d\n File Name: %s\n Start Block: %d", newRootBlock.status, newRootBlock.numBlocks, newRootBlock.fileSize, newRootBlock.fileName, newRootBlock.startBlock);
     while(1) {    
         // Write the current block position into the FAT table
         int amountToWrite = min(DEFAULT_BLOCK_SIZE, newRootBlock.fileSize - amountWritten);
         fread(buffer, 1, amountToWrite, newFile);
-        fflush(stdout);
-        printf("Read data from file\n");
-        for(int i = 0; i < amountToWrite; i++) {
-            printf("%c", buffer[i]);
-        }
-        printf("\n");
         fseek(diskImage, DEFAULT_BLOCK_SIZE * blockPos, SEEK_SET);
         fwrite(&buffer, 1, amountToWrite, diskImage);
         amountWritten += amountToWrite;
         if(amountWritten < newRootBlock.fileSize) {
-            int blockForNetwork = htonl(blockPos);
-            blockPos = findNextFreeFAT(diskImage, sBlock.fatStart, blockPos);
+            int nextBlock = findNextFreeFAT(diskImage, sBlock.fatStart, blockPos);
+            int blockForNetwork = htonl(nextBlock);
+            fseek(diskImage, DEFAULT_BLOCK_SIZE * sBlock.fatStart + blockPos * FAT_ENTRY_SIZE, SEEK_SET);
             fwrite(&blockForNetwork, 1, FAT_ENTRY_SIZE, diskImage);
+            fseek(diskImage, DEFAULT_BLOCK_SIZE * sBlock.fatStart + nextBlock * FAT_ENTRY_SIZE, SEEK_SET);
+            blockPos = nextBlock;
         } else {
+            fseek(diskImage, DEFAULT_BLOCK_SIZE * sBlock.fatStart + blockPos * FAT_ENTRY_SIZE, SEEK_SET);
             fwrite(&fileEnd, 1, FAT_ENTRY_SIZE, diskImage);
             break;
         }
     };
-
-
-    /* do { */
-    /*     amountRead += amountToRead; */
-    /*     fwrite(&buffer, 1, amountToRead, newFile); */
-    /*     fseek(diskImage, DEFAULT_BLOCK_SIZE + fatEntryVal * FAT_ENTRY_SIZE, SEEK_SET); */
-    /*     fatEntryVal = readInt32(diskImage); */
-    /* } while(fatEntryVal != FAT_EOF); */
 
     fclose(diskImage);
     fclose(newFile);

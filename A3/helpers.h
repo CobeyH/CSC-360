@@ -2,7 +2,7 @@
 #include <stdlib.h>
 
 struct SuperBlock {
-    char  ident[8];
+    char ident[8];
     int16_t blockSize;
     int fileSystemSize;
     int fatStart;
@@ -32,6 +32,8 @@ struct RootBlock {
 
 void getDate(FILE *inputFile, struct Date *date);
 
+void writeDate(FILE *outputFile, struct Date date);
+
 void getNextRootBlock(FILE *inputFile, struct RootBlock *block);
 
 void getSuperBlock(FILE *inputFile, struct SuperBlock *block);
@@ -39,3 +41,7 @@ void getSuperBlock(FILE *inputFile, struct SuperBlock *block);
 int readInt32(FILE * inputFile);
 
 int readInt16(FILE * inputFile);
+
+void writeInt32(FILE * outputFile, int32_t buffer);
+
+void writeInt16(FILE * outputFile, int16_t buffer);
