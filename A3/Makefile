@@ -1,12 +1,29 @@
-# CC = gcc
-CFLAGS = -Wall -g   
+OBJS	= diskinfo.o disklist.o diskget.o diskput.o helpers.o
+SOURCE	= diskinfo.c disklist.c diskget.c diskput.c helpers.c
+HEADER	= Constants.h helpers.h
+OUT	= a.out
+CC	 = gcc
+FLAGS	 = -g -c -Wall
+LFLAGS	 = -lm
 
-A3OBJS = diskinfo.o disklist.c helpers.c diskget.c
+all: $(OBJS)
+	$(CC) -g $(OBJS) -o $(OUT) $(LFLAGS)
 
-all: diskinfo disklist helpers
+diskinfo.o: diskinfo.c
+	$(CC) $(FLAGS) diskinfo.c -std=c99
 
-assign3: $(A3OBJS)
-	$(CXX) $(CFLAGS) -o diskinfo disklist helpers diskget $(A3OBJS) $(LDFLAGS) 
+disklist.o: disklist.c
+	$(CC) $(FLAGS) disklist.c -std=c99
 
-clean: 
-	rm -rf $(A2OBJS) diskinfo disklist helpers diskget
+diskget.o: diskget.c
+	$(CC) $(FLAGS) diskget.c -std=c99
+
+diskput.o: diskput.c
+	$(CC) $(FLAGS) diskput.c -std=c99
+
+helpers.o: helpers.c
+	$(CC) $(FLAGS) helpers.c -std=c99
+
+
+clean:
+	rm -f $(OBJS) $(OUT)

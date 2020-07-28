@@ -9,18 +9,22 @@
 #include "helpers.h"
 
 // Returns the index of the first free directory entry. Also moves the file pointer to that position
-int findFirstFreeRoot(FILE* diskImage, struct SuperBlock sBlock, struct RootBlock *rootBlock) {
+int findFirstFreeRoot(FILE* diskImage, struct SuperBlock sBlock, struct RootBlock *rootBlock, char *fileName) {
     // Seek to the start of the root directory
     int startPoint = sBlock.rootStart * DEFAULT_BLOCK_SIZE;
     fseek(diskImage, startPoint, SEEK_SET);
     for(int i = 1; i <= sBlock.blocksInRoot * DIRECTORY_ENTRY_PER_BLOCK; i++) {
         getNextRootBlock(diskImage, rootBlock);
+        if(strcmp(rootBlock->fileName, fileName) == 0) {
+            printf("ERROR: File with the same name already exists in the file system");
+            exit(0);
+        }
         if(!(rootBlock->status & DIRECTORY_ENTRY_USED)) { 
             return i - 1;
         }
         fseek(diskImage, startPoint + i * DIRECTORY_ENTRY_SIZE, SEEK_SET);
     }
-    printf("All directory entries are full");
+    printf("ERROR: All directory entries are full");
     exit(0);
 }
 
@@ -75,13 +79,9 @@ void writeDirEntryToFile(FILE *file, int writePos, struct RootBlock dirEntry, st
     printf("Decimal Address of Root address %d\n", sBlock.rootStart * DEFAULT_BLOCK_SIZE + writePos * DIRECTORY_ENTRY_SIZE);
     fseek(file, sBlock.rootStart * DEFAULT_BLOCK_SIZE + writePos * DIRECTORY_ENTRY_SIZE, SEEK_SET);
     fwrite(&dirEntry.status, 1, 1, file);
-    printf("Status %d\n", dirEntry.status);
     writeInt32(file, dirEntry.startBlock);
-    printf("start block %d\n", dirEntry.startBlock);
     writeInt32(file, dirEntry.numBlocks);
-    printf("Num Blocks %d\n", dirEntry.numBlocks);
     writeInt32(file, dirEntry.fileSize);
-    printf("File Size: %d\n", dirEntry.fileSize);
     writeDate(file, dirEntry.createTime);
     printDate(dirEntry.createTime);
     writeDate(file, dirEntry.modifyTime);
@@ -114,7 +114,7 @@ int main(int argc, char *argv[]) {
     getSuperBlock(diskImage, &sBlock);
     struct RootBlock newRootBlock;
     int amountWritten = 0;
-    int rootEntryPos = findFirstFreeRoot(diskImage, sBlock, &newRootBlock);
+    int rootEntryPos = findFirstFreeRoot(diskImage, sBlock, &newRootBlock, newFileName);
     fillRootStats(&newRootBlock, newFileName);
     int blockPos = findNextFreeFAT(diskImage, sBlock.fatStart, 0);
     newRootBlock.startBlock = blockPos;
