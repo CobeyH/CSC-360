@@ -17,13 +17,13 @@ int readInt16(FILE * inputFile) {
 }
 
 void writeInt32(FILE * outputFile, int32_t buffer) {
-    int32_t toWrite = htonl(toWrite);
-    fread(&toWrite, 1, sizeof(toWrite), outputFile);
+    int32_t toWrite = htonl(buffer);
+    fwrite(&toWrite, 1, sizeof(toWrite), outputFile);
 }
 
 void writeInt16(FILE * outputFile, int16_t buffer) {
     int16_t toWrite = htons(buffer);
-    fwrite(&toWrite, 1, sizeof(buffer), outputFile);
+    fwrite(&toWrite, 1, sizeof(toWrite), outputFile);
 }
 
 void getSuperBlock(FILE *inputFile, struct SuperBlock *block) {                                                                                                                     fread(&block->ident, 1, 8, inputFile);

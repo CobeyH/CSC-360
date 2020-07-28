@@ -56,12 +56,12 @@ void fillRootStats(struct RootBlock *dirEntry, char* fileName) {
     struct stat stats;
     stat(fileName, &stats);
     switch (stats.st_mode & S_IFMT) {
-        case S_IFDIR:  dirEntry->status = 0b11;    break;
-        case S_IFREG:  dirEntry->status = 0b101;   break;
+        case S_IFDIR:  dirEntry->status = 0b101;    break;
+        case S_IFREG:  dirEntry->status = 0b11;     break;
         default:       printf("Unsupported File type passed\n");   break;
     }
     dirEntry->fileSize = stats.st_size;
-    double numBlocks = (dirEntry->fileSize) / DEFAULT_BLOCK_SIZE;
+    double numBlocks = (dirEntry->fileSize) / (double)DEFAULT_BLOCK_SIZE;
     dirEntry->numBlocks = ceil(numBlocks);
     for(int i = 0; i < DIRECTORY_MAX_NAME_LENGTH; i++) {
         dirEntry->fileName[i] = fileName[i];
@@ -72,12 +72,18 @@ void fillRootStats(struct RootBlock *dirEntry, char* fileName) {
 }
 
 void writeDirEntryToFile(FILE *file, int writePos, struct RootBlock dirEntry, struct SuperBlock sBlock) {
+    printf("Decimal Address of Root address %d\n", sBlock.rootStart * DEFAULT_BLOCK_SIZE + writePos * DIRECTORY_ENTRY_SIZE);
     fseek(file, sBlock.rootStart * DEFAULT_BLOCK_SIZE + writePos * DIRECTORY_ENTRY_SIZE, SEEK_SET);
     fwrite(&dirEntry.status, 1, 1, file);
+    printf("Status %d\n", dirEntry.status);
     writeInt32(file, dirEntry.startBlock);
+    printf("start block %d\n", dirEntry.startBlock);
     writeInt32(file, dirEntry.numBlocks);
+    printf("Num Blocks %d\n", dirEntry.numBlocks);
     writeInt32(file, dirEntry.fileSize);
+    printf("File Size: %d\n", dirEntry.fileSize);
     writeDate(file, dirEntry.createTime);
+    printDate(dirEntry.createTime);
     writeDate(file, dirEntry.modifyTime);
     fwrite(&dirEntry.fileName, 1, 31, file);
 }
@@ -115,16 +121,16 @@ int main(int argc, char *argv[]) {
     writeDirEntryToFile(diskImage, rootEntryPos, newRootBlock, sBlock);
     char buffer[DEFAULT_BLOCK_SIZE];
     int fileEnd = FAT_EOF;
-    printf("Status: %4X \n Number of Blocks: %d\n File Size: %d\n File Name: %s\n Start Block: %d", newRootBlock.status, newRootBlock.numBlocks, newRootBlock.fileSize, newRootBlock.fileName, newRootBlock.startBlock);
     while(1) {    
         // Write the current block position into the FAT table
         int amountToWrite = min(DEFAULT_BLOCK_SIZE, newRootBlock.fileSize - amountWritten);
         fread(buffer, 1, amountToWrite, newFile);
         fseek(diskImage, DEFAULT_BLOCK_SIZE * blockPos, SEEK_SET);
-        fwrite(&buffer, 1, amountToWrite, diskImage);
+        fwrite(buffer, 1, amountToWrite, diskImage);
         amountWritten += amountToWrite;
+        printf("Where are we writing to %d\n", blockPos);
         if(amountWritten < newRootBlock.fileSize) {
-            int nextBlock = findNextFreeFAT(diskImage, sBlock.fatStart, blockPos);
+            int nextBlock = findNextFreeFAT(diskImage, sBlock.fatStart, blockPos + 1);
             int blockForNetwork = htonl(nextBlock);
             fseek(diskImage, DEFAULT_BLOCK_SIZE * sBlock.fatStart + blockPos * FAT_ENTRY_SIZE, SEEK_SET);
             fwrite(&blockForNetwork, 1, FAT_ENTRY_SIZE, diskImage);
