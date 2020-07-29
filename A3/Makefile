@@ -1,29 +1,25 @@
-OBJS	= diskinfo.o disklist.o diskget.o diskput.o helpers.o
 SOURCE	= diskinfo.c disklist.c diskget.c diskput.c helpers.c
-HEADER	= Constants.h helpers.h
-OUT	= a.out
+OUT     = diskinfo disklist diskget diskput
+DEPS = Constants.h helpers.h
+HELPER = helpers.c
 CC	 = gcc
-FLAGS	 = -g -c -Wall
-LFLAGS	 = -lm
+FLAGS	 = -Wall -lm
 
-all: $(OBJS)
-	$(CC) -g $(OBJS) -o $(OUT) $(LFLAGS)
+all: diskinfo disklist diskget diskput
 
-diskinfo.o: diskinfo.c
-	$(CC) $(FLAGS) diskinfo.c -std=c99
+diskinfo: diskinfo.c $(HELPER)
+	$(CC) $(FLAGS) -o $@ $(HELPER) diskinfo.c
 
-disklist.o: disklist.c
-	$(CC) $(FLAGS) disklist.c -std=c99
+disklist: disklist.c $(HELPER)
+	$(CC) $(FLAGS) -o $@ $(HELPER) disklist.c 
 
-diskget.o: diskget.c
-	$(CC) $(FLAGS) diskget.c -std=c99
+diskget: diskget.c $(HELPER)
+	$(CC) $(FLAGS) -o $@ $(HELPER) diskget.c 
 
-diskput.o: diskput.c
-	$(CC) $(FLAGS) diskput.c -std=c99
+diskput: diskput.c $(HELPER)
+	$(CC) $(FLAGS) -o $@ $(HELPER) diskput.c 
 
-helpers.o: helpers.c
-	$(CC) $(FLAGS) helpers.c -std=c99
 
 
 clean:
-	rm -f $(OBJS) $(OUT)
+	rm -f $(OUT)
