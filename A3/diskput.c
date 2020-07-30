@@ -45,7 +45,7 @@ void fillDate(struct Date *date) {
     struct tm *fullTime = localtime(&rawTime);
     // Year function returns years since 1900 so we need to add 1900
     date->year = 1900 + fullTime->tm_year;
-    date->month = fullTime->tm_mon;
+    date->month = fullTime->tm_mon + 1;
     date->day = fullTime->tm_mday;
     date->hours = fullTime->tm_hour;
     date->minutes = fullTime->tm_min;
@@ -120,7 +120,6 @@ int main(int argc, char *argv[]) {
     newRootBlock.startBlock = blockPos;
     writeDirEntryToFile(diskImage, rootEntryPos, newRootBlock, sBlock);
     char buffer[DEFAULT_BLOCK_SIZE];
-    int fileEnd = FAT_EOF;
     while(1) {    
         // Write the current block position into the FAT table
         int amountToWrite = min(DEFAULT_BLOCK_SIZE, newRootBlock.fileSize - amountWritten);
@@ -138,7 +137,7 @@ int main(int argc, char *argv[]) {
             blockPos = nextBlock;
         } else {
             fseek(diskImage, DEFAULT_BLOCK_SIZE * sBlock.fatStart + blockPos * FAT_ENTRY_SIZE, SEEK_SET);
-            fwrite(&fileEnd, 1, FAT_ENTRY_SIZE, diskImage);
+            fwrite(&fatEnd, 1, FAT_ENTRY_SIZE, diskImage);
             break;
         }
     };
