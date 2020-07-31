@@ -18,7 +18,7 @@ int main(int argc, char *argv[]) {
     }
     // The data is all read into the struct so that individual sections can be accessed
     getSuperBlock(inputFile, &block);
-    printf("Super block information:\n");
+    printf("Super block information: \n");
     printf("Block size: %d\nBlock count: %d\nFAT starts: %d\nFAT blocks: %d\nRoot directory start: %d\nRoot directory blocks: %d\n",
             block.blockSize, block.fileSystemSize, block.fatStart, block.blocksInFat, block.rootStart, block.blocksInRoot);
 
@@ -38,7 +38,7 @@ int main(int argc, char *argv[]) {
                 allocated++;
         }
     }
-    printf("\nFAT information:\nFree Blocks: %d\nReserved Blocks: %d\nAllocated Blocks: %d", free, reserved, allocated);
+    printf("\nFAT information: \nFree Blocks: %d\nReserved Blocks: %d\nAllocated Blocks: %d\n", free, reserved, allocated);
     fclose(inputFile);
     return 1;
 }

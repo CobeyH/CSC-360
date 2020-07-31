@@ -76,7 +76,6 @@ void fillRootStats(struct RootBlock *dirEntry, char* fileName) {
 }
 
 void writeDirEntryToFile(FILE *file, int writePos, struct RootBlock dirEntry, struct SuperBlock sBlock) {
-    printf("Decimal Address of Root address %d\n", sBlock.rootStart * DEFAULT_BLOCK_SIZE + writePos * DIRECTORY_ENTRY_SIZE);
     fseek(file, sBlock.rootStart * DEFAULT_BLOCK_SIZE + writePos * DIRECTORY_ENTRY_SIZE, SEEK_SET);
     fwrite(&dirEntry.status, 1, 1, file);
     writeInt32(file, dirEntry.startBlock);

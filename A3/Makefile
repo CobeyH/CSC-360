@@ -17,7 +17,7 @@ diskget: diskget.c $(HELPER)
 	$(CC) $(FLAGS) -o $@ $(HELPER) diskget.c 
 
 diskput: diskput.c $(HELPER)
-	$(CC) $(FLAGS) -o $@ $(HELPER) diskput.c 
+	$(CC) -Wall -o $@ $(HELPER) diskput.c -lm
 
 
 
